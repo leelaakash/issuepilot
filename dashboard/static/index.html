@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>IssuePilot — AI Agent Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:      #08080e;
+    --surface: #0f0f1a;
+    --card:    #13131f;
+    --border:  #1c1c2e;
+    --border2: #26263a;
+    --text:    #ddddf0;
+    --muted:   #52527a;
+    --accent:  #7c6aff;
+    --a2:      #a78bfa;
+    --green:   #22d3a0;
+    --red:     #f87171;
+    --yellow:  #fbbf24;
+    --blue:    #38bdf8;
+    --glow:    rgba(124,106,255,0.18);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    line-height: 1.65;
+    min-height: 100vh;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(124,106,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,106,255,0.025) 1px, transparent 1px);
+    background-size: 36px 36px;
+    pointer-events: none; z-index: 0;
+  }
+
+  .shell {
+    position: relative; z-index: 1;
+    max-width: 1100px; margin: 0 auto;
+    padding: 32px 20px;
+    display: flex; flex-direction: column; gap: 24px;
+  }
+
+  /* Header */
+  header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-mark {
+    width: 38px; height: 38px;
+    background: linear-gradient(135deg, var(--accent) 0%, #4f46e5 100%);
+    border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    font-size: 20px; box-shadow: 0 0 24px var(--glow);
+  }
+  .logo-name { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
+  .logo-name em { color: var(--a2); font-style: normal; }
+  .api-badge {
+    display: flex; align-items: center; gap: 7px;
+    background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 20px; padding: 5px 14px; font-size: 11px; color: var(--muted);
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 7px var(--green); animation: blink 2s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  /* Run form */
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 24px; }
+  .panel-title {
+    font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 2.5px; color: var(--muted); margin-bottom: 18px;
+  }
+  .form-grid { display: grid; grid-template-columns: 1fr 150px auto; gap: 10px; align-items: end; }
+  .field label { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 7px; }
+  .field input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border2);
+    border-radius: 8px; padding: 10px 13px; color: var(--text);
+    font-family: 'IBM Plex Mono', monospace; font-size: 13px; outline: none;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,106,255,.12); }
+  .field input::placeholder { color: var(--muted); }
+  .btn-run {
+    background: linear-gradient(135deg, var(--accent), #4f46e5);
+    color: #fff; border: none; border-radius: 8px; padding: 10px 22px;
+    font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700;
+    cursor: pointer; white-space: nowrap;
+    box-shadow: 0 0 18px rgba(124,106,255,.35);
+    transition: transform .15s, box-shadow .15s;
+  }
+  .btn-run:hover { transform: translateY(-1px); box-shadow: 0 0 28px rgba(124,106,255,.5); }
+  .btn-run:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+  /* Pipeline visualizer */
+  .pipeline {
+    display: flex; align-items: center; gap: 0;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px 24px;
+    overflow-x: auto;
+  }
+  .stage {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    min-width: 90px; flex-shrink: 0;
+  }
+  .stage-icon {
+    width: 44px; height: 44px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+    border: 1px solid var(--border2); background: var(--card);
+    transition: all .3s;
+  }
+  .stage-icon.active { border-color: var(--accent); background: rgba(124,106,255,.12); box-shadow: 0 0 16px var(--glow); animation: stagePulse 1s infinite; }
+  .stage-icon.done   { border-color: var(--green);  background: rgba(34,211,160,.1); }
+  .stage-icon.failed { border-color: var(--red);    background: rgba(248,113,113,.1); }
+  @keyframes stagePulse { 0%,100%{box-shadow:0 0 10px var(--glow)} 50%{box-shadow:0 0 22px rgba(124,106,255,.35)} }
+  .stage-name { font-size: 10px; color: var(--muted); text-align: center; text-transform: uppercase; letter-spacing: .8px; }
+  .stage-name.active { color: var(--a2); }
+  .stage-name.done   { color: var(--green); }
+  .arrow { color: var(--border2); font-size: 18px; margin: 0 4px; flex-shrink: 0; padding-bottom: 20px; }
+
+  /* Job list */
+  .jobs-grid { display: flex; flex-direction: column; gap: 12px; }
+  .job-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px 20px;
+    display: grid; grid-template-columns: auto 1fr auto; gap: 16px; align-items: start;
+    transition: border-color .2s;
+    animation: slideIn .3s ease;
+  }
+  @keyframes slideIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+  .job-card:hover { border-color: var(--border2); }
+  .job-status-icon { font-size: 22px; margin-top: 2px; }
+  .job-meta { display: flex; flex-direction: column; gap: 4px; }
+  .job-title { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; color: var(--text); }
+  .job-sub { font-size: 11px; color: var(--muted); }
+  .job-sub span { color: var(--a2); }
+  .job-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  .tag {
+    display: inline-block; border-radius: 6px; padding: 3px 10px; font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .8px;
+  }
+  .tag-queued   { background: rgba(91,91,122,.2);  color: var(--muted); }
+  .tag-running  { background: rgba(124,106,255,.15); color: var(--a2); animation: blink 1.5s infinite; }
+  .tag-success  { background: rgba(34,211,160,.12);  color: var(--green); }
+  .tag-failed   { background: rgba(248,113,113,.12); color: var(--red); }
+  .tag-retrying { background: rgba(251,191,36,.12);  color: var(--yellow); }
+  .pr-link { font-size: 11px; color: var(--accent); text-decoration: none; }
+  .pr-link:hover { color: var(--a2); text-decoration: underline; }
+
+  /* Log panel */
+  .log-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+  .log-header {
+    padding: 14px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .log-header span { font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); }
+  .log-body {
+    padding: 16px 20px; max-height: 280px; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .log-body::-webkit-scrollbar { width: 4px; }
+  .log-body::-webkit-scrollbar-track { background: transparent; }
+  .log-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+  .log-line { display: flex; gap: 12px; font-size: 12px; }
+  .log-agent {
+    width: 88px; flex-shrink: 0; text-align: right;
+    font-weight: 600; opacity: .8;
+  }
+  .log-msg { color: var(--text); opacity: .85; }
+  .log-empty { color: var(--muted); font-size: 12px; text-align: center; padding: 16px 0; }
+
+  /* Footer */
+  footer { color: var(--muted); font-size: 11px; text-align: center; padding-top: 16px; border-top: 1px solid var(--border); }
+  footer a { color: var(--accent); text-decoration: none; }
+
+  @media (max-width: 640px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .pipeline { gap: 0; }
+    .stage { min-width: 70px; }
+    .job-card { grid-template-columns: auto 1fr; }
+    .job-right { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <div class="logo-mark">🛩️</div>
+      <div class="logo-name">Issue<em>Pilot</em></div>
+    </div>
+    <div class="api-badge">
+      <div class="dot"></div>
+      <span id="api-status">Connecting…</span>
+    </div>
+  </header>
+
+  <!-- Run form -->
+  <div class="panel">
+    <div class="panel-title">▸ Trigger Agent</div>
+    <div class="form-grid">
+      <div class="field">
+        <label>Repository</label>
+        <input id="inp-repo" type="text" placeholder="owner/repo" />
+      </div>
+      <div class="field">
+        <label>Issue #</label>
+        <input id="inp-issue" type="number" placeholder="42" min="1" />
+      </div>
+      <button class="btn-run" id="btn-run" onclick="triggerRun()">⚡ Run Agent</button>
+    </div>
+  </div>
+
+  <!-- Pipeline stages -->
+  <div class="pipeline" id="pipeline">
+    <!-- filled by JS -->
+  </div>
+
+  <!-- Jobs list -->
+  <div class="panel">
+    <div class="panel-title">▸ Jobs</div>
+    <div class="jobs-grid" id="jobs-list">
+      <div class="log-empty">No jobs yet. Trigger the agent above.</div>
+    </div>
+  </div>
+
+  <!-- Live log -->
+  <div class="log-panel">
+    <div class="log-header">
+      <span>▸ Live Agent Log</span>
+      <span id="log-job-id" style="color:var(--muted);font-size:11px;"></span>
+    </div>
+    <div class="log-body" id="log-body">
+      <div class="log-empty">Waiting for agent activity…</div>
+    </div>
+  </div>
+
+  <footer>
+    IssuePilot · Multi-Agent GitHub Automation ·
+    <a href="http://localhost:8000/docs" target="_blank">API Docs</a>
+  </footer>
+</div>
+
+<script>
+const API = 'http://localhost:8000';
+const STAGES = [
+  { id: 'code_reader', label: 'Reader',  icon: '📂' },
+  { id: 'planner',     label: 'Planner', icon: '🧠' },
+  { id: 'code_writer', label: 'Coder',   icon: '✍️' },
+  { id: 'test_writer', label: 'Tester',  icon: '🧪' },
+  { id: 'sandbox',     label: 'Sandbox', icon: '🐳' },
+  { id: 'pr_opener',   label: 'PR Open', icon: '🚀' },
+];
+
+let activeJobId = null;
+let ws = null;
+let pollTimer = null;
+
+// ── Build pipeline UI ─────────────────────────────────────────
+function buildPipeline(activeAgent = null, status = null) {
+  const el = document.getElementById('pipeline');
+  el.innerHTML = '';
+  STAGES.forEach((s, i) => {
+    const isActive = s.id === activeAgent;
+    const isDone   = status === 'success' ||
+      (activeAgent && STAGES.findIndex(x=>x.id===activeAgent) > i);
+    const isFailed = status === 'failed' && s.id === activeAgent;
+    const cls = isFailed ? 'failed' : isDone ? 'done' : isActive ? 'active' : '';
+
+    const stage = document.createElement('div');
+    stage.className = 'stage';
+    stage.innerHTML = `
+      <div class="stage-icon ${cls}">${s.icon}</div>
+      <div class="stage-name ${cls}">${s.label}</div>`;
+    el.appendChild(stage);
+
+    if (i < STAGES.length - 1) {
+      const arr = document.createElement('div');
+      arr.className = 'arrow';
+      arr.textContent = '›';
+      el.appendChild(arr);
+    }
+  });
+}
+buildPipeline();
+
+// ── API health check ──────────────────────────────────────────
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API}/health`);
+    if (r.ok) document.getElementById('api-status').textContent = 'API Online';
+    else throw new Error();
+  } catch {
+    document.getElementById('api-status').textContent = 'API Offline';
+    document.querySelector('.dot').style.background = 'var(--red)';
+    document.querySelector('.dot').style.boxShadow = '0 0 7px var(--red)';
+  }
+}
+checkHealth();
+setInterval(checkHealth, 30000);
+
+// ── Trigger run ────────────────────────────────────────────────
+async function triggerRun() {
+  const repo  = document.getElementById('inp-repo').value.trim();
+  const issue = parseInt(document.getElementById('inp-issue').value);
+  if (!repo || !issue) { alert('Fill in repo and issue number'); return; }
+
+  const btn = document.getElementById('btn-run');
+  btn.disabled = true;
+  btn.textContent = '⏳ Queuing…';
+
+  try {
+    const r = await fetch(`${API}/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ repo_name: repo, issue_number: issue }),
+    });
+    const data = await r.json();
+    activeJobId = data.job_id;
+    document.getElementById('log-job-id').textContent = `job: ${activeJobId.slice(0,8)}…`;
+    clearLog();
+    startPolling(activeJobId);
+    openWebSocket(activeJobId);
+    await loadJobs();
+  } catch (e) {
+    alert('Failed to trigger run. Is the API running on :8000?');
+  }
+
+  btn.disabled = false;
+  btn.textContent = '⚡ Run Agent';
+}
+
+// ── Polling fallback ──────────────────────────────────────────
+function startPolling(jobId) {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    await loadJobs();
+    const r = await fetch(`${API}/status/${jobId}`).then(r=>r.json()).catch(()=>null);
+    if (!r) return;
+    buildPipeline(r.messages?.at(-1)?.agent, r.status);
+    if (['success','failed'].includes(r.status)) clearInterval(pollTimer);
+  }, 3000);
+}
+
+// ── WebSocket live log ────────────────────────────────────────
+function openWebSocket(jobId) {
+  if (ws) ws.close();
+  ws = new WebSocket(`ws://localhost:8000/ws/${jobId}`);
+
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    const messages = msg.data?.messages || msg.messages || [];
+    renderLog(messages);
+    const agent  = messages.at(-1)?.agent;
+    const status = msg.data?.status || msg.status;
+    if (agent || status) buildPipeline(agent, status);
+  };
+
+  ws.onerror = () => {};  // polling handles fallback
+}
+
+// ── Log rendering ─────────────────────────────────────────────
+const AGENT_COLORS = {
+  code_reader: '#38bdf8', planner: '#a78bfa', code_writer: '#fbbf24',
+  test_writer: '#22d3a0', sandbox: '#f87171', pr_opener: '#7c6aff',
+  orchestrator: '#52527a',
+};
+
+function renderLog(messages) {
+  const el = document.getElementById('log-body');
+  if (!messages.length) return;
+  el.innerHTML = '';
+  messages.forEach(m => {
+    const color = AGENT_COLORS[m.agent] || '#52527a';
+    const text  = m.summary || m.event || m.reason?.slice(0,120) || JSON.stringify(m).slice(0,120);
+    const line  = document.createElement('div');
+    line.className = 'log-line';
+    line.innerHTML = `
+      <div class="log-agent" style="color:${color}">[${m.agent}]</div>
+      <div class="log-msg">${escHtml(text)}</div>`;
+    el.appendChild(line);
+  });
+  el.scrollTop = el.scrollHeight;
+}
+
+function clearLog() {
+  document.getElementById('log-body').innerHTML =
+    '<div class="log-empty">Agent started — waiting for events…</div>';
+}
+
+// ── Job cards ─────────────────────────────────────────────────
+async function loadJobs() {
+  const jobs = await fetch(`${API}/jobs`).then(r=>r.json()).catch(()=>[]);
+  const el = document.getElementById('jobs-list');
+  if (!jobs.length) {
+    el.innerHTML = '<div class="log-empty">No jobs yet.</div>';
+    return;
+  }
+  el.innerHTML = '';
+  [...jobs].reverse().forEach(j => {
+    const icons = { queued:'⏳', running:'⚡', success:'✅', failed:'❌', retrying:'🔄' };
+    const card = document.createElement('div');
+    card.className = 'job-card';
+    card.innerHTML = `
+      <div class="job-status-icon">${icons[j.status] || '❓'}</div>
+      <div class="job-meta">
+        <div class="job-title">${escHtml(j.repo)} <span style="color:var(--muted)">#${j.issue}</span></div>
+        <div class="job-sub">Job <span>${j.job_id.slice(0,12)}…</span></div>
+      </div>
+      <div class="job-right">
+        <span class="tag tag-${j.status}">${j.status}</span>
+        ${j.pr_url ? `<a class="pr-link" href="${j.pr_url}" target="_blank">↗ View PR</a>` : ''}
+      </div>`;
+    card.onclick = () => {
+      activeJobId = j.job_id;
+      document.getElementById('log-job-id').textContent = `job: ${j.job_id.slice(0,8)}…`;
+      openWebSocket(j.job_id);
+      startPolling(j.job_id);
+    };
+    el.appendChild(card);
+  });
+}
+
+function escHtml(s='') {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Initial load
+loadJobs();
+setInterval(loadJobs, 8000);
+</script>
+</body>
+</html>

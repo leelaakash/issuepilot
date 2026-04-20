@@ -219,19 +219,13 @@ This repeats up to `MAX_RETRIES` (default: 3).
 
 ---
 
-## Interview Talking Points
+## Highlights
 
-> "IssuePilot is a multi-agent orchestration system built on LangGraph where each agent has a single responsibility — reading code, planning, writing fixes, writing tests, sandboxed execution, and PR automation. Agents communicate via a shared typed state object, and the graph uses conditional routing to implement a self-healing retry loop when tests fail. The entire thing is triggered by a GitHub webhook via Actions."
-
-Key concepts demonstrated:
-- **LangGraph StateGraph** with conditional routing and cycles
-- **Shared typed state** flowing across all agents
-- **Self-healing agents** with retry logic baked into graph edges
-- **Sandboxed code execution** via Docker (security-first)
-- **Full GitHub automation** — clone, branch, commit, PR
-- **Real async API** with WebSocket live streaming
-- **Production patterns**: retry/backoff, audit trail, config management
-
+- Multi-agent architecture with 6 specialized agents
+- LangGraph-based orchestration with conditional routing
+- Self-healing retry loop for automated error correction
+- Docker-based sandboxed code execution
+- End-to-end GitHub automation (issue → PR)
 ---
 
 ## License

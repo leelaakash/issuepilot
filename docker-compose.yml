@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  agent:
+    build: .
+    command: ["--server"]
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_USERNAME=${GITHUB_USERNAME}
+      - OPENAI_MODEL=gpt-4o
+      - MAX_RETRIES=3
+      - WORKSPACE_DIR=/workspace
+      - DOCKER_IMAGE=python:3.11-slim
+    volumes:
+      - /workspace:/workspace          # job working directory
+      - /var/run/docker.sock:/var/run/docker.sock  # Docker-in-Docker for sandbox
+    restart: unless-stopped
+
+  dashboard:
+    image: nginx:alpine
+    ports:
+      - "3000:80"
+    volumes:
+      - ./dashboard/static:/usr/share/nginx/html:ro
+    depends_on:
+      - agent

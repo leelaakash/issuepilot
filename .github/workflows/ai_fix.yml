@@ -1,0 +1,66 @@
+name: GitHub AI Agent — Auto Fix
+
+on:
+  issues:
+    types: [labeled]          # trigger when "ai-fix" label is added
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number to fix"
+        required: true
+        type: number
+
+jobs:
+  auto-fix:
+    runs-on: ubuntu-latest
+    # Only run when label == "ai-fix"
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event.label.name == 'ai-fix'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Determine issue number
+        id: issue
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "number=${{ github.event.inputs.issue_number }}" >> $GITHUB_OUTPUT
+          else
+            echo "number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run AI Agent
+        env:
+          OPENAI_API_KEY:  ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN:    ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_USERNAME: ${{ github.actor }}
+          OPENAI_MODEL:    gpt-4o
+          MAX_RETRIES:     "3"
+          WORKSPACE_DIR:   /tmp/workspace
+        run: |
+          python main.py \
+            --repo "${{ github.repository }}" \
+            --issue ${{ steps.issue.outputs.number }}
+
+      - name: Upload audit log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-issue-${{ steps.issue.outputs.number }}
+          path: audit_issue_*.json

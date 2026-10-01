@@ -47,7 +47,7 @@ def _run_in_docker(repo_path: str, test_file: str) -> TestResult:
             passed=passed,
             output=result.stdout,
             errors=result.stderr,
-            retries=state_retries := 0,  # set by caller
+            retries=0,
         )
 
     except subprocess.TimeoutExpired:
@@ -74,8 +74,10 @@ def _run_subprocess_fallback(repo_path: str, test_file: str) -> TestResult:
                 ["python", "-m", "venv", venv_dir],
                 check=True, capture_output=True,
             )
-            pip = os.path.join(venv_dir, "bin", "pip")
-            python = os.path.join(venv_dir, "bin", "python")
+            # Use OS-aware bin directory (Scripts on Windows, bin on POSIX)
+            bin_dir = "Scripts" if os.name == "nt" else "bin"
+            pip    = os.path.join(venv_dir, bin_dir, "pip")
+            python = os.path.join(venv_dir, bin_dir, "python")
 
             req_file = os.path.join(repo_path, "requirements.txt")
             if os.path.exists(req_file):

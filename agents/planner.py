@@ -84,7 +84,7 @@ GitHub Issue #{state['issue_number']}: {state['issue_title']}
     except json.JSONDecodeError as exc:
         logger.error("Planner LLM returned non-JSON: %s", exc)
         # Graceful fallback: store raw text as plan
-        state["plan"]           = raw if "raw" in dir() else "Plan generation failed"
+        state["plan"]           = raw
         state["affected_files"] = state.get("relevant_files", [])
         state["status"]         = AgentStatus.SUCCESS   # non-fatal; coder can still proceed
 

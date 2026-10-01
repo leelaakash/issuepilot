@@ -82,7 +82,7 @@ issuepilot/
 │   ├── llm.py              # OpenAI wrapper with retry/logging
 │   ├── config.py           # Config from .env
 │   └── orchestrator.py     # LangGraph graph + routing logic
-├── github/
+├── github_client/
 │   └── github_utils.py     # Issue fetcher + repo cloner
 ├── dashboard/
 │   ├── api.py              # FastAPI backend + WebSocket

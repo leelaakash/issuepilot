@@ -76,9 +76,9 @@ def route_after_test_writer(state: AgentState) -> str:
 
 def route_after_sandbox(state: AgentState) -> str:
     """
-    Core retry logic:
+    Core retry logic (pure routing — no state mutation):
       - Tests pass → open PR
-      - Tests fail + retries left → increment counter, go back to code_writer
+      - Tests fail + retries left → go to retry node
       - Tests fail + no retries left → fail
     """
     result = state.get("test_result", {})
@@ -91,25 +91,35 @@ def route_after_sandbox(state: AgentState) -> str:
     max_retries = state.get("max_retries", 3)
 
     if retry_count < max_retries:
-        state["retry_count"] = retry_count + 1
-        state["status"]      = AgentStatus.RETRYING
-
-        # Inject test failure into messages so code_writer sees it
-        state["messages"].append({
-            "agent":  "orchestrator",
-            "event":  "retry",
-            "attempt": state["retry_count"],
-            "reason": f"Tests failed:\n{result.get('output', '')[-1500:]}\n{result.get('errors', '')[-500:]}",
-        })
-
         logger.warning(
-            "Tests failed — retry %d/%d → re-running code_writer",
-            state["retry_count"], max_retries,
+            "Tests failed — will retry (%d/%d)",
+            retry_count + 1, max_retries,
         )
-        return "code_writer"   # self-healing loop
+        return "retry"   # → retry_node (mutates state) → code_writer
 
     logger.error("Tests failed after %d retries → aborting", max_retries)
     return "fail"
+
+
+def retry_node(state: AgentState) -> AgentState:
+    """
+    Dedicated node that increments retry_count and injects the test
+    failure context so code_writer can read it on the next attempt.
+    """
+    result = state.get("test_result", {})
+    state["retry_count"] = state.get("retry_count", 0) + 1
+    state["status"]      = AgentStatus.RETRYING
+    state["messages"].append({
+        "agent":   "orchestrator",
+        "event":   "retry",
+        "attempt": state["retry_count"],
+        "reason":  f"Tests failed:\n{result.get('output', '')[-1500:]}\n{result.get('errors', '')[-500:]}",
+    })
+    logger.warning(
+        "Tests failed — retry %d/%d → re-running code_writer",
+        state["retry_count"], state.get("max_retries", 3),
+    )
+    return state
 
 
 def route_after_pr(state: AgentState) -> str:
@@ -145,6 +155,7 @@ def build_graph() -> StateGraph:
     g.add_node("code_writer",  code_writer_agent)
     g.add_node("test_writer",  test_writer_agent)
     g.add_node("sandbox",      sandbox_agent)
+    g.add_node("retry",        retry_node)       # mutation node for retry loop
     g.add_node("pr_opener",    pr_opener_agent)
     g.add_node("fail",         fail_node)
 
@@ -168,11 +179,14 @@ def build_graph() -> StateGraph:
         "sandbox",
         route_after_sandbox,
         {
-            "pr_opener":   "pr_opener",
-            "code_writer": "code_writer",   # retry loop
-            "fail":        "fail",
+            "pr_opener": "pr_opener",
+            "retry":     "retry",    # → retry_node → code_writer
+            "fail":      "fail",
         },
     )
+
+    # retry node always goes back to code_writer
+    g.add_edge("retry", "code_writer")
 
     g.add_conditional_edges("pr_opener",    route_after_pr,
                             {END: END, "fail": "fail"})

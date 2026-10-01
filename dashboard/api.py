@@ -20,7 +20,7 @@ from pydantic import BaseModel
 
 from core.config      import cfg
 from core.orchestrator import run_pipeline
-from github.github_utils import fetch_issue_and_clone
+from github_client.github_utils import fetch_issue_and_clone
 
 logging.basicConfig(
     level=logging.INFO,
@@ -69,7 +69,7 @@ async def _broadcast(job_id: str, event: dict) -> None:
 
 def _run_pipeline_sync(job_id: str, repo_name: str, issue_number: int) -> None:
     """
-    Runs in a thread-pool thread (via BackgroundTasks / asyncio.to_thread).
+    Runs in a thread-pool thread via asyncio.to_thread.
     Patches each agent to emit events to the job store.
     """
     try:
@@ -93,6 +93,11 @@ def _run_pipeline_sync(job_id: str, repo_name: str, issue_number: int) -> None:
             "status": "failed",
             "errors": [str(exc)],
         })
+
+
+async def _run_pipeline_async(job_id: str, repo_name: str, issue_number: int) -> None:
+    """Async wrapper: offloads the blocking pipeline run to a thread."""
+    await asyncio.to_thread(_run_pipeline_sync, job_id, repo_name, issue_number)
 
 
 # ── App ────────────────────────────────────────────────────────────────────────
@@ -123,8 +128,7 @@ async def run(req: RunRequest, background_tasks: BackgroundTasks):
     ws_clients[job_id] = []
 
     background_tasks.add_task(
-        asyncio.to_thread,
-        _run_pipeline_sync,
+        _run_pipeline_async,
         job_id,
         req.repo_name,
         req.issue_number,

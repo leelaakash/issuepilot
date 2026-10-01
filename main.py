@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 def run_agent(repo_name: str, issue_number: int, dry_run: bool = False) -> None:
     from core.config        import cfg
     from core.orchestrator  import run_pipeline
-    from github.github_utils import fetch_issue_and_clone
+    from github_client.github_utils import fetch_issue_and_clone
 
     logger.info("═" * 60)
     logger.info("  GitHub AI Agent")

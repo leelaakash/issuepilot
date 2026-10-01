@@ -118,8 +118,9 @@ class TestOrchestratorRouting:
             max_retries=3,
         )
         result = route_after_sandbox(state)
-        assert result        == "code_writer"
-        assert state["retry_count"] == 1
+        assert result == "retry"
+        # retry_count mutation now happens in retry_node, not the routing fn
+        assert state["retry_count"] == 0  # unchanged by pure routing function
 
     def test_route_after_sandbox_exhausts_retries(self):
         from core.orchestrator import route_after_sandbox

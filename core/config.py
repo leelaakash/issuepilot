@@ -2,10 +2,14 @@
 Central config — reads from environment / .env file.
 """
 import os
-from dataclasses import dataclass
+import tempfile
+from dataclasses import dataclass, field
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Default workspace under the system temp directory (works on Windows + Linux)
+_DEFAULT_WORKSPACE = os.path.join(tempfile.gettempdir(), "issuepilot-workspace")
 
 
 @dataclass
@@ -24,7 +28,7 @@ class Config:
 
     # Agent behaviour
     max_retries:     int = 3
-    workspace_dir:   str = "/tmp/ai-agent-workspace"
+    workspace_dir:   str = field(default_factory=lambda: _DEFAULT_WORKSPACE)
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -36,7 +40,7 @@ class Config:
             docker_image    = os.environ.get("DOCKER_IMAGE",    "python:3.11-slim"),
             sandbox_timeout = int(os.environ.get("SANDBOX_TIMEOUT", "60")),
             max_retries     = int(os.environ.get("MAX_RETRIES",     "3")),
-            workspace_dir   = os.environ.get("WORKSPACE_DIR",   "/tmp/ai-agent-workspace"),
+            workspace_dir   = os.environ.get("WORKSPACE_DIR",   _DEFAULT_WORKSPACE),
         )
 
 
